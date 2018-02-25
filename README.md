@@ -14,6 +14,8 @@ Multiple LCD geometries are supported (20x4, 20x2, 16x8 and 8x1) and it's trivia
 Supported escape sequences:
 * `\r` - carriage return
 * `\n` - line feed (new line)
+* '\t' - tab 4 characters
+* 0x0B - originally vertical tab, here set cursor row and col.
 
 Supported VT100 terminal control escape sequences:
 * `<ESC>[H` - cursor home
@@ -30,3 +32,8 @@ Device attributes exported via sysfs (`/sys/class/hd44780/<device_name>`):
 2. Let the I2C adapter know that there's a new device attached: `echo hd44780 0x27 > /sys/class/i2c-adapter/i2c-1/new_device`.
 You may need to replace the device's I2C address and adapter path with proper values.
 3. At this point a new device should appear (`/dev/lcd0`) and you should be able to write to it.
+
+* Set cursor row 1 col 5
+    echo -n -e \\x0B\\x01\\x05 > /dev/lcd0
+* Tab cursor
+    echo -n -e \\x09 > /dev/lcd0

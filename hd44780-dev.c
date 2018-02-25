@@ -187,6 +187,40 @@ static void hd44780_clear_line(struct hd44780 *lcd)
     hd44780_write_instruction(lcd, HD44780_DDRAM_ADDR | start_addr);
 }
 
+static void hd44780_handle_setcursor(struct hd44780 *lcd, unsigned char row, unsigned char col)
+{
+    struct hd44780_geometry *geo = lcd->geometry;
+
+    lcd->pos.col = col;
+    lcd->pos.row = row;
+
+    if (lcd->pos.col >= geo->cols) {
+        lcd->pos.row = (lcd->pos.row + 1) % geo->rows;
+        lcd->pos.col = 0;
+    }
+
+    if (lcd->pos.row >= geo->rows) {
+        lcd->pos.row = 0;
+    }
+
+    printk("set cursor : %d %d\n",lcd->pos.col, lcd->pos.row);
+    hd44780_write_instruction(lcd, HD44780_DDRAM_ADDR | geo->start_addrs[lcd->pos.row] + lcd->pos.col);
+}
+
+static void hd44780_handle_tab(struct hd44780 *lcd)
+{
+    struct hd44780_geometry *geo = lcd->geometry;
+
+    lcd->pos.col += 4;
+
+    if (lcd->pos.col >= geo->cols) {
+        lcd->pos.row = (lcd->pos.row + 1) % geo->rows;
+        lcd->pos.col = 0;
+    }
+
+    hd44780_write_instruction(lcd, HD44780_DDRAM_ADDR | geo->start_addrs[lcd->pos.row] + lcd->pos.col);
+}
+
 static void hd44780_handle_new_line(struct hd44780 *lcd)
 {
     struct hd44780_geometry *geo = lcd->geometry;
@@ -291,6 +325,16 @@ void hd44780_write(struct hd44780 *lcd, const char *buf, size_t count)
                 break;
             case '\e':
                 lcd->is_in_esc_seq = true;
+                break;
+            case '\t':
+                hd44780_handle_tab(lcd);
+                break;
+            case 0x0B:
+                if((count - i) > 2)
+                {
+                    hd44780_handle_setcursor(lcd,buf[i+1],buf[i+2]);
+                    i += 2;
+                }
                 break;
             default:
                 hd44780_write_char(lcd, ch);
