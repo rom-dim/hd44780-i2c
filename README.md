@@ -9,7 +9,7 @@ The main goal was to expose HD44780-based LCDs behind regular Linux device files
 
 There are no imposed limitations on number of concurrently attached devices. In practice, a single I2C bus allows up to 128 uniquely addressable devices. Furthermore, standard HD44780 LCD to I2C adapters usually use the same, hardcoded I2C address (like 0x27) and it's not possible to change them. The PCF8574 IC supports up to 8 different addresses, so a custom-build adapter might be the solution.
 
-Multiple LCD geometries are supported (20x4, 16x8 and 8x1) and it's trivial to add new ones if needed.
+Multiple LCD geometries are supported (20x4, 20x2, 16x8 and 8x1) and it's trivial to add new ones if needed.
 
 Supported escape sequences:
 * `\r` - carriage return
@@ -21,7 +21,7 @@ Supported VT100 terminal control escape sequences:
 
 Device attributes exported via sysfs (`/sys/class/hd44780/<device_name>`):
 * `backlight` - controls LCD backlight. Possible values: `0`, `1`
-* `geometry` - sets LCD geometry. Possible values: `20x4`, `16x2`, `8x1`
+* `geometry` - sets LCD geometry. Possible values: `20x4`, `20x2`, `16x2`, `8x1`
 * `cursor_blink` - controls cursor blink. Possible values: `0`, `1`
 * `cursor_display` - displays or hides cursor. Possible values: `0`, `1`
 
