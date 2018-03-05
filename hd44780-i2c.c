@@ -202,6 +202,19 @@ static int hd44780_probe(struct i2c_client *client, const struct i2c_device_id *
     struct device *device;
     int ret, minor;
 
+    ret = alloc_chrdev_region(&dev_no, 0, NUM_DEVICES, NAME);
+    if (ret) {
+        pr_warn("Can't allocate chardev region");
+        return ret;
+    }
+
+    hd44780_class = class_create(THIS_MODULE, CLASS_NAME);
+    if (IS_ERR(hd44780_class)) {
+        ret = PTR_ERR(hd44780_class);
+        pr_warn("Can't create %s class\n", CLASS_NAME);
+        goto remove_chrdev;
+    }
+
     minor = atomic_inc_return(&next_minor);
     devt = MKDEV(MAJOR(dev_no), minor);
 
@@ -251,6 +264,8 @@ del_exit:
     spin_unlock(&hd44780_list_lock);
 exit:
     kfree(lcd);
+remove_chrdev:
+    unregister_chrdev_region(dev_no, NUM_DEVICES);
 
     return ret;
 }
@@ -285,6 +300,8 @@ static int hd44780_remove(struct i2c_client *client)
 
     kfree(lcd);
 
+    class_destroy(hd44780_class);
+    unregister_chrdev_region(dev_no, NUM_DEVICES);
     return 0;
 }
 
@@ -293,57 +310,26 @@ static const struct i2c_device_id hd44780_id[] = {
 { }
 };
 
+#ifdef CONFIG_OF
+static const struct of_device_id goodix_of_match[] = {
+    { .compatible = "pcf8574,lcd" },
+    { }
+};
+MODULE_DEVICE_TABLE(of, goodix_of_match);
+#endif
+
 static struct i2c_driver hd44780_driver = {
     .driver = {
         .name	= NAME,
         .owner	= THIS_MODULE,
+        .of_match_table = of_match_ptr(goodix_of_match),
     },
     .probe = hd44780_probe,
     .remove = hd44780_remove,
     .id_table = hd44780_id,
 };
 
-static int __init hd44780_mod_init(void)
-{
-    int ret;
-
-    ret = alloc_chrdev_region(&dev_no, 0, NUM_DEVICES, NAME);
-    if (ret) {
-        pr_warn("Can't allocate chardev region");
-        return ret;
-    }
-
-    hd44780_class = class_create(THIS_MODULE, CLASS_NAME);
-    if (IS_ERR(hd44780_class)) {
-        ret = PTR_ERR(hd44780_class);
-        pr_warn("Can't create %s class\n", CLASS_NAME);
-        goto exit;
-    }
-
-    ret = i2c_add_driver(&hd44780_driver);
-    if (ret) {
-        pr_warn("Can't register I2C driver %s\n", hd44780_driver.driver.name);
-        goto destroy_exit;
-    }
-
-    return 0;
-
-destroy_exit:
-    class_destroy(hd44780_class);
-exit:
-    unregister_chrdev_region(dev_no, NUM_DEVICES);
-
-    return ret;
-}
-module_init(hd44780_mod_init);
-
-static void __exit hd44780_mod_exit(void)
-{
-    i2c_del_driver(&hd44780_driver);
-    class_destroy(hd44780_class);
-    unregister_chrdev_region(dev_no, NUM_DEVICES);
-}
-module_exit(hd44780_mod_exit);
+module_i2c_driver(hd44780_driver);
 
 MODULE_AUTHOR("Mariusz Gorski <marius.gorski@gmail.com>");
 MODULE_DESCRIPTION("HD44780 I2C via PCF8574 driver");
