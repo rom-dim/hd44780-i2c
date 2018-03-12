@@ -203,7 +203,7 @@ static void hd44780_handle_setcursor(struct hd44780 *lcd, unsigned char row, uns
         lcd->pos.row = 0;
     }
 
-    hd44780_write_instruction(lcd, HD44780_DDRAM_ADDR | geo->start_addrs[lcd->pos.row] + lcd->pos.col);
+    hd44780_write_instruction(lcd, HD44780_DDRAM_ADDR | (geo->start_addrs[lcd->pos.row] + lcd->pos.col));
 }
 
 static void hd44780_handle_tab(struct hd44780 *lcd)
@@ -217,7 +217,7 @@ static void hd44780_handle_tab(struct hd44780 *lcd)
         lcd->pos.col = 0;
     }
 
-    hd44780_write_instruction(lcd, HD44780_DDRAM_ADDR | geo->start_addrs[lcd->pos.row] + lcd->pos.col);
+    hd44780_write_instruction(lcd, HD44780_DDRAM_ADDR | (geo->start_addrs[lcd->pos.row] + lcd->pos.col));
 }
 
 static void hd44780_handle_new_line(struct hd44780 *lcd)
