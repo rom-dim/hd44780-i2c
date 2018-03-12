@@ -203,7 +203,6 @@ static void hd44780_handle_setcursor(struct hd44780 *lcd, unsigned char row, uns
         lcd->pos.row = 0;
     }
 
-    printk("set cursor : %d %d\n",lcd->pos.col, lcd->pos.row);
     hd44780_write_instruction(lcd, HD44780_DDRAM_ADDR | geo->start_addrs[lcd->pos.row] + lcd->pos.col);
 }
 
