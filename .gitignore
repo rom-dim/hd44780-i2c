@@ -9,3 +9,6 @@ Module.symvers
 *.mod.o
 *.o
 *.order 
+*.includes
+*.config
+*.files
