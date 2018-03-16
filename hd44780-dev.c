@@ -2,6 +2,7 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/kernel.h>
 
 #include "hd44780.h"
 
@@ -243,7 +244,10 @@ static void hd44780_handle_carriage_return(struct hd44780 *lcd)
 static void hd44780_leave_esc_seq(struct hd44780 *lcd)
 {
     memset(lcd->esc_seq_buf.buf, 0, ESC_SEQ_BUF_SIZE);
+    memset(lcd->esc_seq_buf.param, 0, NUM_ESC_PARAMS*sizeof(long));
+    lcd->esc_seq_buf.param_index = 0;
     lcd->esc_seq_buf.length = 0;
+    lcd->esc_seq_buf.param_err = 0;
     lcd->is_in_esc_seq = false;
 }
 
@@ -274,30 +278,91 @@ void hd44780_flush(struct hd44780 *lcd)
         hd44780_flush_esc_seq(lcd);
 }
 
+void hd44780_add_new_vt100_param(struct hd44780 *lcd)
+{
+    if(lcd->esc_seq_buf.length == 0)
+        return;
+
+    if(lcd->esc_seq_buf.param_index >= NUM_ESC_PARAMS)
+    {
+        lcd->esc_seq_buf.param_err = 1;
+        return;
+    }
+
+    if (kstrtol(lcd->esc_seq_buf.buf, 0, &lcd->esc_seq_buf.param[lcd->esc_seq_buf.param_index]) != 0)
+    {
+        lcd->esc_seq_buf.param_err = 1;
+        return;
+    }
+
+    lcd->esc_seq_buf.param_index++;
+    lcd->esc_seq_buf.length = 0;
+    memset(lcd->esc_seq_buf.buf, 0, ESC_SEQ_BUF_SIZE);
+
+}
+
 static void hd44780_handle_esc_seq_char(struct hd44780 *lcd, char ch)
 {
-    int prev_row, prev_col;
+    static enum {CMD_START,CMD_PARAM,CMD_END}VT100_state = CMD_START;
 
-    lcd->esc_seq_buf.buf[lcd->esc_seq_buf.length++] = ch;
+    switch(VT100_state)
+    {
+    case CMD_START:
+        if(ch == '[')
+            VT100_state = CMD_PARAM;
+        break;
 
-    if (!strcmp(lcd->esc_seq_buf.buf, "[2J")) {
-        prev_row = lcd->pos.row;
-        prev_col = lcd->pos.col;
+    case CMD_PARAM:
+        switch(ch)
+        {
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            lcd->esc_seq_buf.buf[lcd->esc_seq_buf.length++] = ch;
+            return;
 
-        hd44780_clear_display(lcd);
-        hd44780_write_instruction(lcd, HD44780_DDRAM_ADDR | (lcd->geometry->start_addrs[prev_row] + prev_col));
+        case ';':
+            hd44780_add_new_vt100_param(lcd);
+            return;
 
+        default:
+            hd44780_add_new_vt100_param(lcd);
+        }
+
+    case CMD_END:
+        if(!lcd->esc_seq_buf.param_err )
+        {
+            switch(ch)
+            {
+            case 'J':
+                if(lcd->esc_seq_buf.param_index == 1 && lcd->esc_seq_buf.param[0] == 2)
+                {
+                    hd44780_clear_display(lcd);
+                    hd44780_write_instruction(lcd, HD44780_RETURN_HOME);
+                    lcd->pos.row = 0;
+                    lcd->pos.col = 0;
+                }
+                break;
+
+            case 'H':
+                if(lcd->esc_seq_buf.param_index == 2 )
+                    hd44780_handle_setcursor(lcd, lcd->esc_seq_buf.param[0], lcd->esc_seq_buf.param[1]);
+                break;
+            }
+        }
+        VT100_state = CMD_START;
         hd44780_leave_esc_seq(lcd);
-    } else if (!strcmp(lcd->esc_seq_buf.buf, "[H")) {
-        hd44780_write_instruction(lcd, HD44780_RETURN_HOME);
-        lcd->pos.row = 0;
-        lcd->pos.col = 0;
-
-        hd44780_leave_esc_seq(lcd);
-    } else if (lcd->esc_seq_buf.length == ESC_SEQ_BUF_SIZE) {
-        hd44780_flush_esc_seq(lcd);
+        break;
     }
 }
+
 
 void hd44780_write(struct hd44780 *lcd, const char *buf, size_t count)
 {
@@ -327,13 +392,6 @@ void hd44780_write(struct hd44780 *lcd, const char *buf, size_t count)
                 break;
             case '\t':
                 hd44780_handle_tab(lcd);
-                break;
-            case 0x0B:
-                if((count - i) > 2)
-                {
-                    hd44780_handle_setcursor(lcd,buf[i+1],buf[i+2]);
-                    i += 2;
-                }
                 break;
             default:
                 hd44780_write_char(lcd, ch);
@@ -388,6 +446,8 @@ void hd44780_set_cursor_display(struct hd44780 *lcd, bool cursor_display)
 }
 void hd44780_init_lcd(struct hd44780 *lcd)
 {
+    lcd->esc_seq_buf.param_index = 0;
+    lcd->esc_seq_buf.param_err = 0;
     hd44780_write_instruction_high_nibble(lcd, HD44780_FUNCTION_SET
                                           | HD44780_DL_8BITS);
     mdelay(5);

@@ -2,8 +2,8 @@
 #define _HD44780_H_
 
 #define BUF_SIZE		64
-#define ESC_SEQ_BUF_SIZE	4
-
+#define ESC_SEQ_BUF_SIZE	16
+#define NUM_ESC_PARAMS  2
 struct hd44780_geometry {
     int cols;
     int rows;
@@ -24,6 +24,10 @@ struct hd44780 {
 
     char buf[BUF_SIZE];
     struct {
+
+        long param[NUM_ESC_PARAMS];
+        int param_index;
+        unsigned char param_err;
         char buf[ESC_SEQ_BUF_SIZE];
         int length;
     } esc_seq_buf;
