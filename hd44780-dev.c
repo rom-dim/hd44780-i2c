@@ -373,6 +373,10 @@ void hd44780_write(struct hd44780 *lcd, const char *buf, size_t count)
         hd44780_clear_display(lcd);
         lcd->dirty = false;
     }
+    if(!lcd->cursor_blink && !lcd->cursor_display && lcd->newline_dirty) {
+        lcd->newline_dirty = false;
+        hd44780_handle_new_line(lcd);
+    }
 
     for (i = 0; i < count; i++) {
         ch = buf[i];
@@ -385,7 +389,10 @@ void hd44780_write(struct hd44780 *lcd, const char *buf, size_t count)
                 hd44780_handle_carriage_return(lcd);
                 break;
             case '\n':
-                hd44780_handle_new_line(lcd);
+                if (!lcd->cursor_blink && !lcd->cursor_display && i != count-1)
+                    hd44780_handle_new_line(lcd);
+                else
+                    lcd->newline_dirty = true;
                 break;
             case '\e':
                 lcd->is_in_esc_seq = true;

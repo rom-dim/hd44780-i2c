@@ -38,6 +38,7 @@ struct hd44780 {
     bool cursor_display;
 
     bool dirty;
+    bool newline_dirty;
 
     struct mutex lock;
     struct list_head list;
